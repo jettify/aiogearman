@@ -1,0 +1,5 @@
+Sphinx
+coverage
+pep8
+pyflakes
+ipdb
