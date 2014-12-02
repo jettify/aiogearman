@@ -1,21 +1,51 @@
 import struct
-from .consts import PKT_FMT
+from . import consts
 
 
 class Reader:
 
-    def feed(self, chunk):
-        """
+    def __init__(self):
+        self._buffer = bytearray()
 
-        :return:
+        self._is_header = False
+        self._payload_size = None
+
+    def feed(self, chunk):
+        """Put raw chunk of data obtained from connection to buffer.
+        :param data: ``bytes``, raw input data.
         """
+        if not chunk:
+            return
+        self._buffer.extend(chunk)
 
     def gets(self):
         """
 
         :return:
         """
+        buffer_size = len(self._buffer)
+        if not self._is_header and buffer_size >= consts.HEADER_LEN:
+            magic, cmd, size = struct.unpack(consts.PKT_FMT,
+                                 self._buffer[:consts.HEADER_LEN])
+            self._payload_size = size
+            self._is_header = True
 
+        if (self._is_header and
+                    buffer_size >= consts.HEADER_LEN + self._payload_size):
+            start = consts.HEADER_LEN
+            end = consts.HEADER_LEN + self._payload_size
+
+            raw_resp = self._buffer[start, end]
+            resp = bytes(raw_resp).split(consts.NULL)
+            self._reset()
+            return resp
+        return False
+
+    def _reset(self):
+        start = consts.HEADER_LEN + self._payload_size
+        self._buffer = self._buffer[start:]
+        self._is_header = False
+        self._payload_size = None
 
 
 _converters = {
@@ -39,5 +69,5 @@ def encode_command(magic, packet, *args):
         else:
             raise TypeError("Argument {!r} expected to be of bytes,"
                             " str, int or float type".format(arg))
-    header = struct.pack(PKT_FMT, magic, packet, len(barg))
+    header = struct.pack(consts.PKT_FMT, magic, packet, len(barg))
     return header + barg
