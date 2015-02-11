@@ -1,7 +1,8 @@
 import asyncio
-
+import struct
 
 from collections import deque
+
 from .parser import encode_command, Reader
 from .log import logger
 
@@ -9,23 +10,35 @@ from .log import logger
 @asyncio.coroutine
 def create_connection(host='localhost', port=4730, loop=None):
     """XXX"""
-    reader, writer = yield from asyncio.open_connection(
-        host, port, loop=loop)
-    conn = GearmanConnection(reader, writer, loop=loop)
+    conn = GearmanConnection(host, port, loop=loop)
+    yield from conn._connect()
     return conn
 
 
 class GearmanConnection:
     """XXX"""
 
-    def __init__(self, reader, writer, *, loop=None):
+    PKT_FMT = struct.Struct(b">III")
+    HEADER_LEN = struct.calcsize(b">III")
 
-        self._reader, self._writer = reader, writer
+    def __init__(self, host='localhost', port=4730, loop=None):
+
+        self._host = host
+        self._port = port
+
+        self._reader = None
+        self._writer = None
+        self._reader_task = None
+
         self._loop = loop or asyncio.get_event_loop()
-        self._parser = Reader()
-        self._cmd_waiters = deque()
+        # self._parser = Reader()
+        self._requests = deque()
         self._closing = False
         self._closed = False
+
+    def _connect(self):
+        self._reader, self._writer = yield from asyncio.open_connection(
+            self._host, self._port, loop=self._loop)
         self._reader_task = asyncio.Task(self._read_data(), loop=self._loop)
 
     def execute(self, magic, packet, *args):
@@ -54,26 +67,35 @@ class GearmanConnection:
     @asyncio.coroutine
     def _read_data(self):
         """Response reader task."""
-        is_canceled = False
-        while not self._reader.at_eof():
-            try:
-                data = yield from self._reader.read(consts.MAX_CHUNK_SIZE)
-            except asyncio.CancelledError:
-                is_canceled = True
-                break
-            except Exception as exc:
-                break
-            self._parser.feed(data)
+        try:
+            while True:
+                resp = yield from self._reader.readexactly(self.HEADER_LEN)
+                magic, packet_type, size = self.PKT_FMT.unpack(resp)
+                data = yield from self._reader.readexactly(size)
 
-        if is_canceled:
-            # useful during update to TLS, task canceled but connection
-            # should not be closed
-            return
-        self._closing = True
-        self._loop.call_soon(self._do_close, None)
+                fut = self._requests.pop(0)
+                if not fut.cancelled():
+                    fut.set_result((packet_type, data))
 
-    def _parse_data(self):
-        pass
+        except OSError as exc:
+            conn_exc = ConnectionError("at {0}:{1} went away".format(
+                self._host, self._port))
+            conn_exc.__cause__ = exc
+            conn_exc.__context__ = exc
+            fut = self._requests.pop(0)
+            fut.set_exception(conn_exc)
+            self.close()
+
+    def close(self):
+        if self._reader:
+            self._writer.close()
+            self._reader = self._writer = None
+            self._reader_task.cancel()
+            for fut in self._requests:
+                fut.cancel()
+            self._requests = []
+
+
 
     def __repr__(self):
         return '<GearmanConnection>'
