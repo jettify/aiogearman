@@ -2,8 +2,7 @@ import asyncio
 import struct
 
 from collections import deque
-
-from .parser import encode_command, Reader
+from .utils import encode_command
 from .log import logger
 
 
@@ -31,7 +30,6 @@ class GearmanConnection:
         self._reader_task = None
 
         self._loop = loop or asyncio.get_event_loop()
-        # self._parser = Reader()
         self._requests = deque()
         self._closing = False
         self._closed = False
@@ -41,13 +39,14 @@ class GearmanConnection:
             self._host, self._port, loop=self._loop)
         self._reader_task = asyncio.Task(self._read_data(), loop=self._loop)
 
-    def execute(self, magic, packet, *args):
+    def execute(self, magic, packet_type, *args):
         """XXX"""
         assert self._reader and not self._reader.at_eof(), (
             "Connection closed or corrupted")
         fut = asyncio.Future(loop=self._loop)
-        command_raw = encode_command(magic, packet, *args)
+        command_raw = encode_command(magic, packet_type, *args)
         self._writer.write(command_raw)
+        self._requests.append(fut)
         return fut
 
     def close(self):
@@ -73,16 +72,16 @@ class GearmanConnection:
                 magic, packet_type, size = self.PKT_FMT.unpack(resp)
                 data = yield from self._reader.readexactly(size)
 
-                fut = self._requests.pop(0)
+                fut = self._requests.pop()
                 if not fut.cancelled():
                     fut.set_result((packet_type, data))
 
         except OSError as exc:
-            conn_exc = ConnectionError("at {0}:{1} went away".format(
+            conn_exc = ConnectionError("Gearman {0}:{1} went away".format(
                 self._host, self._port))
             conn_exc.__cause__ = exc
             conn_exc.__context__ = exc
-            fut = self._requests.pop(0)
+            fut = self._requests.pop()
             fut.set_exception(conn_exc)
             self.close()
 
