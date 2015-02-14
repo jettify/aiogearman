@@ -1,5 +1,6 @@
+import asyncio
 import struct
-from . import consts
+from .consts import REQ
 
 
 _converters = {
@@ -23,5 +24,54 @@ def encode_command(magic, packet_type, *args):
         else:
             raise TypeError("Argument {!r} expected to be of bytes,"
                             " str, int or float type".format(arg))
-    header = struct.pack(consts.PKT_FMT, magic, packet_type, len(barg))
-    return header + barg
+
+    header = REQ + struct.pack(">II", packet_type, len(buf))
+    return header + buf
+
+
+class JobHandle:
+
+
+    def __init__(self, function, data, unique_id, job_id, loop):
+        self._function = function
+        self._data = data
+        self._unique_id = unique_id
+
+        self._job_id= job_id
+
+        self._work_data = []
+        self._work_warnings = []
+
+        self._loop = loop
+        self._fut = asyncio.Future(loop=self._loop)
+
+    def _add_result(self, data):
+        self._work_data.append(data)
+
+    def _notify(self):
+        self._fut.set_result(self._work_data)
+
+    def wait_result(self):
+        return self._fut
+
+    @property
+    def function(self):
+        return self._function
+
+    @property
+    def data(self):
+        return self._data
+
+    @property
+    def unique_id(self):
+        return self._unique_id
+
+    @property
+    def job_id(self):
+        return self._job_id
+
+    @property
+    def result(self):
+        if not self._fut.done():
+            raise Exception('Wait for job completion with yf')
+        return self._work_data

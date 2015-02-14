@@ -4,6 +4,11 @@ import struct
 from collections import deque
 from .utils import encode_command
 from .log import logger
+from .consts import REQ, WORK_COMPLETE, WORK_FAIL, NOOP, WORK_DATA, \
+    WORK_WARNING, WORK_EXCEPTION
+
+
+__all__ = ['create_connection', 'GearmanConnection']
 
 
 @asyncio.coroutine
@@ -20,6 +25,9 @@ class GearmanConnection:
     PKT_FMT = struct.Struct(b">III")
     HEADER_LEN = struct.calcsize(b">III")
 
+    _unsolicited = [WORK_COMPLETE, WORK_FAIL, NOOP,
+                    WORK_DATA, WORK_WARNING, WORK_EXCEPTION]
+
     def __init__(self, host='localhost', port=4730, loop=None):
 
         self._host = host
@@ -31,37 +39,42 @@ class GearmanConnection:
 
         self._loop = loop or asyncio.get_event_loop()
         self._requests = deque()
-        self._closing = False
         self._closed = False
+        self._push_callback = None
+
+    @property
+    def host(self):
+        return self._host
+
+    @property
+    def port(self):
+        return self._port
+
+    @property
+    def loop(self):
+        return self._loop
+
+    @property
+    def closed(self):
+        return self._closed
 
     def _connect(self):
         self._reader, self._writer = yield from asyncio.open_connection(
             self._host, self._port, loop=self._loop)
         self._reader_task = asyncio.Task(self._read_data(), loop=self._loop)
 
-    def execute(self, magic, packet_type, *args):
+    def execute(self, packet_type, *args, no_ack=False):
         """XXX"""
         assert self._reader and not self._reader.at_eof(), (
             "Connection closed or corrupted")
-        fut = asyncio.Future(loop=self._loop)
-        command_raw = encode_command(magic, packet_type, *args)
+        command_raw = encode_command(REQ, packet_type, *args)
         self._writer.write(command_raw)
+        fut = asyncio.Future(loop=self._loop)
+        if no_ack:
+            fut.set_result(None)
+            return fut
         self._requests.append(fut)
         return fut
-
-    def close(self):
-        """Close connection."""
-        self._do_close()
-
-    def _do_close(self, exc=None):
-        if exc:
-            logger.error("Connection closed with error: {}".format(exc))
-        if self._closed:
-            return
-        self._closed = True
-        self._closing = False
-        self._writer.transport.close()
-        self._reader_task.cancel()
 
     @asyncio.coroutine
     def _read_data(self):
@@ -71,7 +84,10 @@ class GearmanConnection:
                 resp = yield from self._reader.readexactly(self.HEADER_LEN)
                 magic, packet_type, size = self.PKT_FMT.unpack(resp)
                 data = yield from self._reader.readexactly(size)
-
+                if packet_type in self._unsolicited:
+                    if self._push_callback is not None:
+                        self._push_callback(packet_type, data)
+                    continue
                 fut = self._requests.pop()
                 if not fut.cancelled():
                     fut.set_result((packet_type, data))
@@ -85,7 +101,12 @@ class GearmanConnection:
             fut.set_exception(conn_exc)
             self.close()
 
+    def _handle_unsolicited(self, packet_type, data):
+        if self._push_callback is not None:
+            self._push_callback(packet_type, data)
+
     def close(self):
+        self._closed = True
         if self._reader:
             self._writer.close()
             self._reader = self._writer = None
@@ -94,7 +115,10 @@ class GearmanConnection:
                 fut.cancel()
             self._requests = []
 
-
+    def register_push_cb(self, callback):
+        assert callable(callback)
+        self._push_callback = callback
 
     def __repr__(self):
-        return '<GearmanConnection>'
+        return '<GearmanConnection {}:{}>'.format(self._host, self._port)
+
