@@ -29,15 +29,29 @@ def encode_command(magic, packet_type, *args):
     return header + buf
 
 
-class JobHandle:
+def unpack_first_arg(data):
+    """XXX
 
+    :param data:
+    :return:
+    """
+    pos = data.find(b'\0')
+    head = data[:pos]
+    rest = data[pos+1:]
+    return head, rest
+
+
+class JobHandle:
+    """
+
+    """
 
     def __init__(self, function, data, unique_id, job_id, loop):
         self._function = function
         self._data = data
         self._unique_id = unique_id
 
-        self._job_id= job_id
+        self._job_id = job_id
 
         self._work_data = []
         self._work_warnings = []
@@ -48,8 +62,11 @@ class JobHandle:
     def _add_result(self, data):
         self._work_data.append(data)
 
-    def _notify(self):
+    def _notify_complete(self):
         self._fut.set_result(self._work_data)
+
+    def _set_exception(self, exc):
+        self._fut.set_exception(exc)
 
     def wait_result(self):
         return self._fut

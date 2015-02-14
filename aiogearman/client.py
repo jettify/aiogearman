@@ -1,9 +1,13 @@
 import asyncio
+from aiogearman import GearmanWorkFailException, GearmanWorkException
+from aiogearman.log import logger
 from .connection import create_connection
+
 from .consts import SUBMIT_JOB, NULL, SUBMIT_JOB_LOW, SUBMIT_JOB_HIGH, \
     SUBMIT_JOB_LOW_BG, SUBMIT_JOB_HIGH_BG, SUBMIT_JOB_BG, WORK_COMPLETE, \
-    WORK_DATA
-from .utils import JobHandle
+    WORK_DATA, WORK_EXCEPTION, WORK_FAIL
+
+from .utils import JobHandle, unpack_first_arg
 
 
 def create_client(host='localhost', port=4730, loop=None):
@@ -13,6 +17,9 @@ def create_client(host='localhost', port=4730, loop=None):
 
 
 class GearmanClient:
+    """
+
+    """
 
     def __init__(self, conn):
         self._conn = conn
@@ -63,18 +70,27 @@ class GearmanClient:
 
     def _push(self, packet_type, data):
         if packet_type == WORK_COMPLETE:
-            pos = data.find(b'\0')
-            job_id = data[:pos]
-            result = data[pos+1:]
+            job_id, result = unpack_first_arg(data)
             job = self._jobs.pop(job_id)
             job._add_result(result)
             job._notify()
 
-
         elif packet_type == WORK_DATA:
-            pos = data.find(b'\0')
-            job_id = data[:pos]
-            result = data[pos+1:]
+            job_id, result = unpack_first_arg(data)
             job = self._jobs[job_id]
             job._add_result(result)
+
+        elif packet_type == WORK_FAIL:
+            job_id, result = unpack_first_arg(data)
+            job = self._jobs.pop(job_id)
+            job._set_exception(GearmanWorkFailException())
+
+        elif packet_type == WORK_EXCEPTION:
+            job_id, result = unpack_first_arg(data)
+            job = self._jobs.pop(job_id)
+            job._set_exception(GearmanWorkException(result))
+        else:
+            logger.warning("got packet_type: {}, how to handle?".format(
+                packet_type))
+
 
