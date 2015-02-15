@@ -1,32 +1,38 @@
-PYTHON ?= python3
-FLAKE ?= pyflakes
-PEP ?= pep8
+# Some simple testing tasks (sorry, UNIX only).
 
-.PHONY: all flake doc test cov
-all: flake doc cov
+FLAGS=
+
+
+flake:
+	flake8 aiogearman tests
+
+test:
+	nosetests -s $(FLAGS) ./tests/
+
+vtest: flake
+	nosetests -s -v $(FLAGS) ./tests/
+
+cov cover coverage:
+	nosetests -s --with-cover --cover-html --cover-branches $(FLAGS) --cover-package aiogearman ./tests/
+	@echo "open file://`pwd`/cover/index.html"
+
+clean:
+	rm -rf `find . -name __pycache__`
+	rm -f `find . -type f -name '*.py[co]' `
+	rm -f `find . -type f -name '*~' `
+	rm -f `find . -type f -name '.*~' `
+	rm -f `find . -type f -name '@*' `
+	rm -f `find . -type f -name '#*#' `
+	rm -f `find . -type f -name '*.orig' `
+	rm -f `find . -type f -name '*.rej' `
+	rm -f .coverage
+	rm -rf coverage
+	rm -rf build
+	rm -rf cover
+	rm -rf dist
 
 doc:
 	make -C docs html
+	@echo "open file://`pwd`/docs/_build/html/index.html"
 
-flake:
-	$(FLAKE) aiogearman tests examples
-	$(PEP) aiogearman tests examples
-
-test:
-	$(PYTHON) runtests.py -v
-
-cov coverage:
-	$(PYTHON) runtests.py --coverage
-
-clean:
-	find . -name __pycache__ |xargs rm -rf
-	find . -type f -name '*.py[co]' -delete
-	find . -type f -name '*~' -delete
-	find . -type f -name '.*~' -delete
-	find . -type f -name '@*' -delete
-	find . -type f -name '#*#' -delete
-	find . -type f -name '*.orig' -delete
-	find . -type f -name '*.rej' -delete
-	rm -f .coverage
-	rm -rf coverage
-	rm -rf docs/_build
+.PHONY: all flake test vtest cov clean doc
