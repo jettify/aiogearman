@@ -11,7 +11,6 @@ class ClientTest(BaseTest):
         client = yield from create_client(loop=self.loop)
         job = yield from client.submit('echo', 'test\na\n', unique_id=123)
         result = yield from job.wait_result()
-        import ipdb; ipdb.set_trace()
         self.assertTrue(result)
 
 

@@ -15,7 +15,7 @@ __all__ = ['create_connection', 'GearmanConnection']
 def create_connection(host='localhost', port=4730, loop=None):
     """XXX"""
     conn = GearmanConnection(host, port, loop=loop)
-    yield from conn._connect()
+    yield from conn.connect()
     return conn
 
 
@@ -58,13 +58,19 @@ class GearmanConnection:
     def closed(self):
         return self._closed
 
-    def _connect(self):
+    def connect(self):
         self._reader, self._writer = yield from asyncio.open_connection(
             self._host, self._port, loop=self._loop)
         self._reader_task = asyncio.Task(self._read_data(), loop=self._loop)
 
     def execute(self, packet_type, *args, no_ack=False):
-        """XXX"""
+        """XXX
+
+        :param packet_type:
+        :param args:
+        :param no_ack:
+        :return:
+        """
         assert self._reader and not self._reader.at_eof(), (
             "Connection closed or corrupted")
         command_raw = encode_command(REQ, packet_type, *args)
@@ -121,4 +127,3 @@ class GearmanConnection:
 
     def __repr__(self):
         return '<GearmanConnection {}:{}>'.format(self._host, self._port)
-

@@ -47,5 +47,4 @@ SUBMIT_JOB_EPOCH = 36
 PKT_FMT = ">III"
 HEADER_LEN = struct.calcsize(PKT_FMT)
 
-MAX_CHUNK_SIZE = 2**16
 NULL = b'\00'

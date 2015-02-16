@@ -1,13 +1,17 @@
 import asyncio
-from aiogearman import GearmanWorkFailException, GearmanWorkException
-from aiogearman.log import logger
+
+from .errors import GearmanWorkFailException, GearmanWorkException
+from .log import logger
 from .connection import create_connection
 
 from .consts import SUBMIT_JOB, NULL, SUBMIT_JOB_LOW, SUBMIT_JOB_HIGH, \
     SUBMIT_JOB_LOW_BG, SUBMIT_JOB_HIGH_BG, SUBMIT_JOB_BG, WORK_COMPLETE, \
     WORK_DATA, WORK_EXCEPTION, WORK_FAIL
 
-from .utils import JobHandle, unpack_first_arg
+from .utils import unpack_first_arg
+
+
+__all__ = ['create_client', 'GearmanClient']
 
 
 def create_client(host='localhost', port=4730, loop=None):
@@ -17,9 +21,7 @@ def create_client(host='localhost', port=4730, loop=None):
 
 
 class GearmanClient:
-    """
-
-    """
+    """XXX"""
 
     def __init__(self, conn):
         self._conn = conn
@@ -43,7 +45,37 @@ class GearmanClient:
             submit_packet, function, data, unique_id)
         return job_id
 
+    def _push(self, packet_type, data):
+        job_id, result = unpack_first_arg(data)
+
+        if packet_type == WORK_COMPLETE:
+            job = self._jobs.pop(job_id)
+            job._add_result(result)
+            job._notify()
+
+        elif packet_type == WORK_DATA:
+            job = self._jobs[job_id]
+            job._add_result(result)
+
+        elif packet_type == WORK_FAIL:
+            job = self._jobs.pop(job_id)
+            job._set_exception(GearmanWorkFailException())
+
+        elif packet_type == WORK_EXCEPTION:
+            job = self._jobs.pop(job_id)
+            job._set_exception(GearmanWorkException(result))
+        else:
+            logger.warning("got packet_type: {}, how to handle?".format(
+                packet_type))
+
     def submit(self, function, data, unique_id=NULL):
+        """XXX
+
+        :param function:
+        :param data:
+        :param unique_id:
+        :return:
+        """
         r = self._submit(SUBMIT_JOB, function, data, unique_id)
         return r
 
@@ -68,29 +100,59 @@ class GearmanClient:
         r = self._submit_bg(SUBMIT_JOB_LOW_BG, function, data, unique_id)
         return r
 
-    def _push(self, packet_type, data):
-        if packet_type == WORK_COMPLETE:
-            job_id, result = unpack_first_arg(data)
-            job = self._jobs.pop(job_id)
-            job._add_result(result)
-            job._notify()
-
-        elif packet_type == WORK_DATA:
-            job_id, result = unpack_first_arg(data)
-            job = self._jobs[job_id]
-            job._add_result(result)
-
-        elif packet_type == WORK_FAIL:
-            job_id, result = unpack_first_arg(data)
-            job = self._jobs.pop(job_id)
-            job._set_exception(GearmanWorkFailException())
-
-        elif packet_type == WORK_EXCEPTION:
-            job_id, result = unpack_first_arg(data)
-            job = self._jobs.pop(job_id)
-            job._set_exception(GearmanWorkException(result))
-        else:
-            logger.warning("got packet_type: {}, how to handle?".format(
-                packet_type))
+    def __repr__(self):
+        return '<GearmanClient {}:{}>'.format(self._conn.host, self._conn.port)
 
 
+class JobHandle:
+    """XXX"""
+
+    def __init__(self, function, data, unique_id, job_id, loop):
+        self._function = function
+        self._data = data
+        self._unique_id = unique_id
+
+        self._job_id = job_id
+
+        self._work_data = []
+        self._work_warnings = []
+
+        self._loop = loop
+        self._fut = asyncio.Future(loop=self._loop)
+
+    def _add_result(self, data):
+        self._work_data.append(data)
+
+    def _notify_complete(self):
+        self._fut.set_result(self._work_data)
+
+    def _set_exception(self, exc):
+        self._fut.set_exception(exc)
+
+    def wait_result(self):
+        return self._fut
+
+    @property
+    def function(self):
+        return self._function
+
+    @property
+    def data(self):
+        return self._data
+
+    @property
+    def unique_id(self):
+        return self._unique_id
+
+    @property
+    def job_id(self):
+        return self._job_id
+
+    @property
+    def result(self):
+        if not self._fut.done():
+            raise Exception('Wait for job completion with yf')
+        return self._work_data
+
+    def __repr__(self):
+        return '<JobHandle {}:{}>'.format(self._job_id, self._function)

@@ -1,6 +1,6 @@
 import asyncio
 import struct
-from .consts import REQ
+from .consts import REQ, RES
 
 
 _converters = {
@@ -13,19 +13,24 @@ _converters = {
 
 
 def encode_command(magic, packet_type, *args):
-    """XXX"""
-    buf = bytearray()
-    add = lambda data: buf.extend(data + b'\00')
+    """XXX
 
+    :param magic:
+    :param packet_type:
+    :param args:
+    :return:
+    """
+    assert magic in [REQ, RES], 'magic number must be REQ or RES value'
+    _args = []
     for arg in args:
         if type(arg) in _converters:
             barg = _converters[type(arg)](arg)
-            add(barg)
+            _args.append(barg)
         else:
             raise TypeError("Argument {!r} expected to be of bytes,"
                             " str, int or float type".format(arg))
-
-    header = REQ + struct.pack(">II", packet_type, len(buf))
+    buf = b'\0'.join(_args)
+    header = magic + struct.pack(">II", packet_type, len(buf))
     return header + buf
 
 
@@ -40,55 +45,3 @@ def unpack_first_arg(data):
     rest = data[pos+1:]
     return head, rest
 
-
-class JobHandle:
-    """
-
-    """
-
-    def __init__(self, function, data, unique_id, job_id, loop):
-        self._function = function
-        self._data = data
-        self._unique_id = unique_id
-
-        self._job_id = job_id
-
-        self._work_data = []
-        self._work_warnings = []
-
-        self._loop = loop
-        self._fut = asyncio.Future(loop=self._loop)
-
-    def _add_result(self, data):
-        self._work_data.append(data)
-
-    def _notify_complete(self):
-        self._fut.set_result(self._work_data)
-
-    def _set_exception(self, exc):
-        self._fut.set_exception(exc)
-
-    def wait_result(self):
-        return self._fut
-
-    @property
-    def function(self):
-        return self._function
-
-    @property
-    def data(self):
-        return self._data
-
-    @property
-    def unique_id(self):
-        return self._unique_id
-
-    @property
-    def job_id(self):
-        return self._job_id
-
-    @property
-    def result(self):
-        if not self._fut.done():
-            raise Exception('Wait for job completion with yf')
-        return self._work_data
