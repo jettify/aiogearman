@@ -28,6 +28,7 @@ pip-delete-this-directory.txt
 
 # Unit test / coverage reports
 htmlcov/
+cover/
 .tox/
 .coverage
 .cache
@@ -55,3 +56,8 @@ coverage.xml
 # Sphinx documentation
 docs/_build/
 
+# PyCharm
+.idea
+*.iml
+# rope
+.ropeproject
