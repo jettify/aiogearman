@@ -30,28 +30,30 @@ class GearmanClient:
         self._jobs = {}
 
     @asyncio.coroutine
-    def _submit(self, submit_packet, function, data, unique_id=NULL):
+    def _submit(self, submit_packet, function, data, unique_id=None):
         """Submit a job with the given function name and data."""
+        unique_id = unique_id or b''
         packet_type, job_id = yield from self._conn.execute(
-            submit_packet, function, data, unique_id)
+            submit_packet, function, unique_id, data)
         handle = JobHandle(function, data, unique_id, job_id, self._loop)
         self._jobs[job_id] = handle
         return handle
 
     @asyncio.coroutine
-    def _submit_bg(self, submit_packet, function, data, unique_id=NULL):
+    def _submit_bg(self, submit_packet, function, data, unique_id=None):
         """Submit a job with the given function name and data."""
+        unique_id = unique_id or b''
+
         packet_type, job_id = yield from self._conn.execute(
             submit_packet, function, data, unique_id)
         return job_id
 
     def _push(self, packet_type, data):
         job_id, result = unpack_first_arg(data)
-
         if packet_type == WORK_COMPLETE:
             job = self._jobs.pop(job_id)
             job._add_result(result)
-            job._notify()
+            job._notify_complete()
 
         elif packet_type == WORK_DATA:
             job = self._jobs[job_id]
@@ -68,7 +70,7 @@ class GearmanClient:
             logger.warning("got packet_type: {}, how to handle?".format(
                 packet_type))
 
-    def submit(self, function, data, unique_id=NULL):
+    def submit(self, function, data, unique_id=None):
         """XXX
 
         :param function:
@@ -79,24 +81,24 @@ class GearmanClient:
         r = self._submit(SUBMIT_JOB, function, data, unique_id)
         return r
 
-    def submit_high(self, function, data, unique_id=NULL):
+    def submit_high(self, function, data, unique_id=None):
         r = self._submit(SUBMIT_JOB_HIGH, function, data, unique_id)
         return r
 
-    def submit_low(self, function, data, unique_id=NULL):
+    def submit_low(self, function, data, unique_id=None):
         r = self._submit(SUBMIT_JOB_LOW, function, data, unique_id)
         return r
 
-    def submit_bg(self, function, data, unique_id=NULL):
+    def submit_bg(self, function, data, unique_id=None):
         r = self._submit_bg(SUBMIT_JOB_BG, function, data, unique_id)
         return r
 
-    def submit_high_bg(self, function, data, unique_id=NULL):
+    def submit_high_bg(self, function, data, unique_id=None):
         r = self._submit_bg(self, SUBMIT_JOB_HIGH_BG, function, data,
                             unique_id)
         return r
 
-    def submit_low_bg(self, function, data, unique_id=NULL):
+    def submit_low_bg(self, function, data, unique_id=None):
         r = self._submit_bg(SUBMIT_JOB_LOW_BG, function, data, unique_id)
         return r
 
@@ -114,14 +116,20 @@ class JobHandle:
 
         self._job_id = job_id
 
-        self._work_data = []
+        self._work_data = None
         self._work_warnings = []
 
         self._loop = loop
         self._fut = asyncio.Future(loop=self._loop)
 
     def _add_result(self, data):
-        self._work_data.append(data)
+        if not self._work_data:
+            self._work_data = data
+        elif isinstance(self._work_data, list):
+            self._work_data.append(data)
+        else:
+            self._work_data = [self._work_data]
+            self._work_data.append(data)
 
     def _notify_complete(self):
         self._fut.set_result(self._work_data)

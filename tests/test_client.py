@@ -12,5 +12,3 @@ class ClientTest(BaseTest):
         job = yield from client.submit('echo', 'test\na\n', unique_id=123)
         result = yield from job.wait_result()
         self.assertTrue(result)
-
-
