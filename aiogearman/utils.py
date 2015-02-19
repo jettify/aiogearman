@@ -1,4 +1,3 @@
-import asyncio
 import struct
 from .consts import REQ, RES
 
@@ -44,4 +43,3 @@ def unpack_first_arg(data):
     head = data[:pos]
     rest = data[pos+1:]
     return head, rest
-

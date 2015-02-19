@@ -1,8 +1,6 @@
-import asyncio
 from ._testutil import BaseTest, run_until_complete
 from aiogearman import create_client
-from aiogearman.consts import ECHO_REQ, ECHO_RES
-from aiogearman.connection import create_connection
+
 
 class ClientTest(BaseTest):
 

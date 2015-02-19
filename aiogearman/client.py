@@ -4,7 +4,7 @@ from .errors import GearmanWorkFailException, GearmanWorkException
 from .log import logger
 from .connection import create_connection
 
-from .consts import SUBMIT_JOB, NULL, SUBMIT_JOB_LOW, SUBMIT_JOB_HIGH, \
+from .consts import SUBMIT_JOB, SUBMIT_JOB_LOW, SUBMIT_JOB_HIGH, \
     SUBMIT_JOB_LOW_BG, SUBMIT_JOB_HIGH_BG, SUBMIT_JOB_BG, WORK_COMPLETE, \
     WORK_DATA, WORK_EXCEPTION, WORK_FAIL
 

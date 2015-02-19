@@ -3,7 +3,6 @@ import struct
 
 from collections import deque
 from .utils import encode_command
-from .log import logger
 from .consts import REQ, WORK_COMPLETE, WORK_FAIL, NOOP, WORK_DATA, \
     WORK_WARNING, WORK_EXCEPTION
 

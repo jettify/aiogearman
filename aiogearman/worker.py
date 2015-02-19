@@ -71,7 +71,7 @@ class GearmanWorker:
             result = yield from func(data)
             yield from self._conn.execute(WORK_COMPLETE, job_id, result,
                                           no_ack=True)
-        except Exception as e:
+        except Exception:
             etype, emsg, bt = sys.exc_info()
             logger.error("Worker error: {}:{}".format(etype, emsg))
             msg = b'%s(%s)' % (etype.__name__, emsg)

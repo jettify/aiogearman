@@ -1,4 +1,5 @@
 """Protocol definitions."""
+
 # http://gearman.org/protocol/
 import struct
 
@@ -10,7 +11,7 @@ CAN_DO = 1
 CANT_DO = 2
 RESET_ABILITIES = 3
 PRE_SLEEP = 4
-#unused
+# unused
 NOOP = 6
 SUBMIT_JOB = 7
 JOB_CREATED = 8

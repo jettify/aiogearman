@@ -7,10 +7,10 @@ class GearmanException(Exception):
 
     code = ERROR
 
+
 class GearmanWorkFailException(GearmanException):
     """This is to notify the server (and any listening clients) that
     the job failed.
-
     """
 
     code = WORK_FAIL
