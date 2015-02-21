@@ -94,7 +94,7 @@ class GearmanClient:
         return r
 
     def submit_high_bg(self, function, data, unique_id=None):
-        r = self._submit_bg(self, SUBMIT_JOB_HIGH_BG, function, data,
+        r = self._submit_bg(SUBMIT_JOB_HIGH_BG, function, data,
                             unique_id)
         return r
 
