@@ -2,6 +2,7 @@ import asyncio
 import unittest
 
 from functools import wraps
+from aiogearman import create_worker
 
 
 def run_until_complete(fun):
@@ -27,3 +28,24 @@ class BaseTest(unittest.TestCase):
     def tearDown(self):
         self.loop.close()
         del self.loop
+
+
+class GearmanTest(BaseTest):
+
+    def setUp(self):
+        super().setUp()
+        self.worker = self.loop.run_until_complete(self._create_worker())
+
+    def tearDown(self):
+        self.worker.close()
+        super().tearDown()
+
+    @asyncio.coroutine
+    def _create_worker(self):
+        worker = yield from create_worker(loop=self.loop)
+
+        @asyncio.coroutine
+        def rev(data):
+            return data[::-1]
+        yield from worker.register_function(b'rev', rev)
+        return worker
