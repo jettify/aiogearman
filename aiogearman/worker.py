@@ -74,11 +74,11 @@ class GearmanWorker:
         except Exception:
             etype, emsg, bt = sys.exc_info()
             logger.error("Worker error: {}:{}".format(etype, emsg))
-            msg = b'%s(%s)' % (etype.__name__, emsg)
+            msg = '%s(%s)' % (etype.__name__, emsg)
             yield from self._conn.execute(WORK_EXCEPTION, job_id, msg,
                                           no_ack=True)
-            yield from self._conn.execute(WORK_FAIL, job_id,
-                                          no_ack=True)
+            # yield from self._conn.execute(WORK_FAIL, job_id,
+            #                               no_ack=True)
 
     @asyncio.coroutine
     def do_job(self):
