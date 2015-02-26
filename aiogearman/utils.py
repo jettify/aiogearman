@@ -40,6 +40,7 @@ def unpack_first_arg(data):
     :return:
     """
     pos = data.find(b'\0')
+    pos = pos if pos > 0 else len(data)
     head = data[:pos]
     rest = data[pos+1:]
     return head, rest
