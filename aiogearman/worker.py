@@ -1,10 +1,11 @@
+from abc import ABCMeta, abstractmethod
 import asyncio
 import sys
 from .log import logger
 from .connection import create_connection
 from .consts import SET_CLIENT_ID, CAN_DO, \
     GRAB_JOB, WORK_COMPLETE, WORK_EXCEPTION, WORK_FAIL, ECHO_REQ, PRE_SLEEP, \
-    NO_JOB, NOOP
+    NO_JOB, NOOP, WORK_DATA
 
 
 __all__ = ['create_worker', 'GearmanWorker']
@@ -67,6 +68,14 @@ class GearmanWorker:
     @asyncio.coroutine
     def _work(self, job_id, function, data):
         func = self._functions[function]
+
+        if isinstance(func, Job):
+            j = Job(self._conn, job_id)
+            func = j.function
+
+        if not asyncio.iscoroutine(func):
+            func = asyncio.coroutine(func)
+
         try:
             result = yield from func(data)
             yield from self._conn.execute(WORK_COMPLETE, job_id, result,
@@ -114,3 +123,66 @@ class GearmanWorker:
 
     def __repr__(self):
         return '<GearmanWorker {}:{}>'.format(self._conn.host, self._conn.port)
+
+
+class Job(metaclass=ABCMeta):
+    """XXX"""
+
+    def __init__(self, conn, job_id):
+        self._conn = conn
+        self._job_id = job_id
+        self._is_finalised = False
+
+    @property
+    def job_id(self):
+        """XXX"""
+        return self._job_id
+
+    @property
+    def is_finalised(self):
+        return self._is_finalised
+
+    @asyncio.coroutine
+    def _execute(self, command, data=None):
+        if self._is_finalised:
+            raise RuntimeError("you can not finish job several times")
+
+        if command in (WORK_FAIL, WORK_EXCEPTION, WORK_COMPLETE):
+            self._is_finalised = True
+
+        yield from self._conn.execute(command, self._job_id, data,
+                                      no_ack=True)
+
+    @asyncio.coroutine
+    def work_fail(self):
+        """XXX
+
+        :return:
+        """
+        yield from self._execute(WORK_FAIL)
+
+    @asyncio.coroutine
+    def work_complete(self, result):
+        """XXX
+
+        :param result:
+        :return:
+        """
+        yield from self._execute(WORK_COMPLETE, result)
+
+    @asyncio.coroutine
+    def send_work_data(self, data):
+        """XXX
+
+        :param data:
+        :return:
+        """
+        yield from self._execute(WORK_DATA, data)
+
+    @abstractmethod
+    def function(self, data):
+        """XXX
+
+        :param data:
+        :return:
+        """
