@@ -21,11 +21,7 @@ class GearmanWorkException(GearmanException):
 
     This is to notify the server (and any listening clients) that
     the job failed with the given exception.
-
-    Arguments:
-    - NULL byte terminated job handle.
-    - Opaque data that is returned to the client as an exception."""
-
+    """
     code = WORK_EXCEPTION
 
 
