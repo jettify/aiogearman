@@ -1,7 +1,9 @@
 import asyncio
+from unittest import mock
 from ._testutil import BaseTest, run_until_complete
+
 from aiogearman.consts import ECHO_REQ, ECHO_RES, REQ
-from aiogearman.connection import create_connection
+from aiogearman.connection import create_connection, GearmanConnection
 from aiogearman.utils import encode_command
 
 
@@ -61,3 +63,24 @@ class ConnectionTest(BaseTest):
 
         with self.assertRaises(TypeError):
             encode_command(REQ, ECHO_RES, object())
+
+    @run_until_complete
+    def test_osserror(self):
+        conn = GearmanConnection(loop=self.loop)
+
+        @asyncio.coroutine
+        def invoke_osserror(*a, **kw):
+            yield from asyncio.sleep(0.1, loop=self.loop)
+            raise OSError
+
+        # setup reader
+        reader = mock.MagicMock()
+        reader.readexactly.return_value = invoke_osserror()
+        reader.at_eof.return_value = False
+        writer = mock.MagicMock()
+        conn._reader = reader
+        conn._writer = writer
+        conn._read_task = asyncio.async(conn._read_data(), loop=self.loop)
+
+        with self.assertRaises(ConnectionError):
+            yield from conn.execute(ECHO_RES, 'foo')
