@@ -1,7 +1,8 @@
 import asyncio
 from ._testutil import BaseTest, run_until_complete
-from aiogearman.consts import ECHO_REQ, ECHO_RES
+from aiogearman.consts import ECHO_REQ, ECHO_RES, REQ
 from aiogearman.connection import create_connection
+from aiogearman.utils import encode_command
 
 
 class ConnectionTest(BaseTest):
@@ -27,3 +28,14 @@ class ConnectionTest(BaseTest):
         conn.close()
         conn.close()
         self.assertEqual(conn.closed, True)
+
+    def test_encode_command(self):
+        res = encode_command(REQ, ECHO_RES, 'foo', 3.14)
+        expected = b'\x00REQ\x00\x00\x00\x11\x00\x00\x00\x08foo\x003.14'
+        self.assertEqual(res, expected)
+        res = encode_command(REQ, ECHO_RES, b'foo', bytearray(b'Q'))
+        expected = b'\x00REQ\x00\x00\x00\x11\x00\x00\x00\x05foo\x00Q'
+        self.assertEqual(res, expected)
+
+        with self.assertRaises(TypeError):
+            encode_command(REQ, ECHO_RES, object())
