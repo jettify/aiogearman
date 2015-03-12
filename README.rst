@@ -1,5 +1,7 @@
 aiogearman (work in progress)
 =============================
+.. image:: https://travis-ci.org/jettify/aiogearman.svg?branch=master
+    :target: https://travis-ci.org/jettify/aiogearman
 
 
 Requirements
