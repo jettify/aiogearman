@@ -8,12 +8,28 @@ class ClientTest(GearmanTest):
     def test_client_ctor(self):
         client = yield from create_client(loop=self.loop)
         job = yield from client.submit(b'rev', b'submit', unique_id=1)
+        yield from self.worker.do_job()
+
+        result = yield from job.wait_result()
+        self.assertEqual(result, job.result)
+        self.assertEqual(result, b'timbus')
+
+        self.assertTrue('Gearman' in client.__repr__())
+
+    @run_until_complete
+    def test_job_handle_attributes(self):
+        client = yield from create_client(loop=self.loop)
+        job = yield from client.submit(b'rev', b'submit', unique_id=1)
 
         self.assertEqual(job.function, b'rev')
         self.assertEqual(job.data, b'submit')
         self.assertEqual(job.unique_id, 1)
         self.assertTrue(job.job_id, 3)
 
+        with self.assertRaises(RuntimeError):
+            print(job.result)
+
+        self.assertTrue(str(job.job_id) in job.__repr__())
         yield from self.worker.do_job()
 
         result = yield from job.wait_result()
@@ -63,3 +79,12 @@ class ClientTest(GearmanTest):
                                               unique_id=8)
         yield from self.worker.do_job()
         self.assertTrue(job)
+
+    @run_until_complete
+    def test_send_work_data_couple_of_times(self):
+        client = yield from create_client(loop=self.loop)
+        job = yield from client.submit(b'foobar', b'submit_low', unique_id=9)
+        yield from self.worker.do_job()
+        result = yield from job.wait_result()
+        self.assertEqual(result, [b'foo', b'baz', b'bar'])
+        self.assertTrue(job.result, [b'foo', b'baz', b'bar'])
