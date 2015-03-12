@@ -106,10 +106,6 @@ class GearmanConnection:
             fut.set_exception(conn_exc)
             self.close()
 
-    def _handle_unsolicited(self, packet_type, data):
-        if self._push_callback is not None:
-            self._push_callback(packet_type, data)
-
     def close(self):
         self._closed = True
         if self._reader:

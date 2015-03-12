@@ -23,14 +23,3 @@ class GearmanWorkException(GearmanException):
     the job failed with the given exception.
     """
     code = WORK_EXCEPTION
-
-
-errors_map = {
-    ERROR: GearmanException,
-    WORK_FAIL: GearmanWorkFailException,
-    WORK_EXCEPTION: GearmanWorkException
-}
-
-
-def heck_error(code):
-    return errors_map.get(code, None)
