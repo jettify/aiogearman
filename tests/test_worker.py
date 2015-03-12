@@ -1,7 +1,8 @@
 import asyncio
 from ._testutil import BaseTest, run_until_complete
-from aiogearman import create_worker, GearmanWorkException
+from aiogearman import create_worker, GearmanWorkFailException
 import aiogearman
+from aiogearman.worker import Job
 
 
 class WorkerTest(BaseTest):
@@ -20,10 +21,13 @@ class WorkerTest(BaseTest):
         job = yield from client.submit(b'rev', b'foo')
         worker = yield from create_worker(loop=self.loop)
 
-        @asyncio.coroutine
-        def rev(data):
-            return data[::-1]
-        yield from worker.register_function(b'rev', rev)
+        class RevJob(Job):
+
+            @asyncio.coroutine
+            def function(self, data):
+                return data[::-1]
+
+        yield from worker.register_function(b'rev', RevJob)
         yield from worker.do_job()
 
         r = yield from job.wait_result()
@@ -35,11 +39,14 @@ class WorkerTest(BaseTest):
         job = yield from client.submit(b'rev', b'foo')
         worker = yield from create_worker(loop=self.loop)
 
-        @asyncio.coroutine
-        def rev(data):
-            raise Exception('log story short: error')
+        class RevJob(Job):
 
-        yield from worker.register_function(b'rev', rev)
+            @asyncio.coroutine
+            def function(self, data):
+                raise Exception('log story short: error')
+
+        yield from worker.register_function(b'rev', RevJob)
         yield from worker.do_job()
-        with self.assertRaises(GearmanWorkException):
+
+        with self.assertRaises(GearmanWorkFailException):
             yield from job.wait_result()

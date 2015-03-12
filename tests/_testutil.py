@@ -3,6 +3,7 @@ import unittest
 
 from functools import wraps
 from aiogearman import create_worker
+from aiogearman.worker import Job
 
 
 def run_until_complete(fun):
@@ -44,8 +45,20 @@ class GearmanTest(BaseTest):
     def _create_worker(self):
         worker = yield from create_worker(loop=self.loop)
 
-        @asyncio.coroutine
-        def rev(data):
-            return data[::-1]
-        yield from worker.register_function(b'rev', rev)
+        class RevJob(Job):
+
+            @asyncio.coroutine
+            def function(self, data):
+                return data[::-1]
+
+        class FooJob(Job):
+
+            @asyncio.coroutine
+            def function(self, data):
+                yield from self.send_work_data('foo')
+                yield from self.send_work_data('baz')
+                return 'bar'
+
+        yield from worker.register_function(b'rev', RevJob)
+        yield from worker.register_function(b'foobar', FooJob)
         return worker
