@@ -67,14 +67,9 @@ class GearmanWorker:
 
     @asyncio.coroutine
     def _work(self, job_id, function, data):
-        func = self._functions[function]
-
-        if isinstance(func, Job):
-            j = Job(self._conn, job_id)
-            func = j.function
-
-        if not asyncio.iscoroutine(func):
-            func = asyncio.coroutine(func)
+        job_handler_class = self._functions[function]
+        job_handler = job_handler_class(self._conn, job_id)
+        func = job_handler.function
 
         try:
             result = yield from func(data)
@@ -86,8 +81,8 @@ class GearmanWorker:
             msg = '%s(%s)' % (etype.__name__, emsg)
             yield from self._conn.execute(WORK_EXCEPTION, job_id, msg,
                                           no_ack=True)
-            # yield from self._conn.execute(WORK_FAIL, job_id,
-            #                               no_ack=True)
+            yield from self._conn.execute(WORK_FAIL, job_id,
+                                          no_ack=True)
 
     @asyncio.coroutine
     def do_job(self):
@@ -160,15 +155,6 @@ class Job(metaclass=ABCMeta):
         :return:
         """
         yield from self._execute(WORK_FAIL)
-
-    @asyncio.coroutine
-    def work_complete(self, result):
-        """XXX
-
-        :param result:
-        :return:
-        """
-        yield from self._execute(WORK_COMPLETE, result)
 
     @asyncio.coroutine
     def send_work_data(self, data):
