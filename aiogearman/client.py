@@ -1,12 +1,12 @@
 import asyncio
 
-from .errors import GearmanWorkFailException, GearmanWorkException
+from .errors import GearmanWorkFailException
 from .log import logger
 from .connection import create_connection
 
 from .consts import SUBMIT_JOB, SUBMIT_JOB_LOW, SUBMIT_JOB_HIGH, \
     SUBMIT_JOB_LOW_BG, SUBMIT_JOB_HIGH_BG, SUBMIT_JOB_BG, WORK_COMPLETE, \
-    WORK_DATA, WORK_EXCEPTION, WORK_FAIL
+    WORK_DATA, WORK_FAIL
 
 from .utils import unpack_first_arg
 
@@ -63,9 +63,9 @@ class GearmanClient:
             job = self._jobs.pop(job_id)
             job._set_exception(GearmanWorkFailException())
 
-        elif packet_type == WORK_EXCEPTION:
-            job = self._jobs.pop(job_id)
-            job._set_exception(GearmanWorkException(result))
+        # elif packet_type == WORK_EXCEPTION:
+        #     job = self._jobs.pop(job_id)
+        #     job._set_exception(GearmanWorkException(result))
         else:
             logger.warning("got packet_type: {}, how to handle?".format(
                 packet_type))
@@ -159,7 +159,7 @@ class JobHandle:
     @property
     def result(self):
         if not self._fut.done():
-            raise Exception('Wait for job completion with yf')
+            raise RuntimeError('Wait for job completion with yf')
         return self._work_data
 
     def __repr__(self):
