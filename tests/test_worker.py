@@ -13,6 +13,7 @@ class WorkerTest(BaseTest):
         yield from worker.set_worker_id(42)
         resp = yield from worker.echo(b'foo')
         self.assertEqual(resp, b'foo')
+        self.assertTrue('GearmanWorker' in worker.__repr__())
         worker.close()
 
     @run_until_complete
@@ -80,3 +81,45 @@ class WorkerTest(BaseTest):
 
         with self.assertRaises(GearmanWorkFailException):
             yield from job.wait_result()
+
+    @run_until_complete
+    def test_do_job_explicit_fail(self):
+        client = yield from aiogearman.create_client(loop=self.loop)
+        job = yield from client.submit(b'rev', b'foo')
+        worker = yield from create_worker(loop=self.loop)
+
+        class RevJob(Job):
+
+            @asyncio.coroutine
+            def function(self, data):
+                yield from self.work_fail()
+
+        yield from worker.register_function(b'rev', RevJob)
+        yield from worker.do_job()
+
+        with self.assertRaises(GearmanWorkFailException):
+            yield from job.wait_result()
+
+
+
+    @run_until_complete
+    def test_do_job_with_sleep(self):
+
+        worker = yield from create_worker(loop=self.loop)
+
+        class RevJob(Job):
+
+            @asyncio.coroutine
+            def function(self, data):
+                return data[::-1]
+
+        yield from worker.register_function(b'rev', RevJob)
+        asyncio.async(worker.do_job(), loop=self.loop)
+
+        yield from asyncio.sleep(0.1, loop=self.loop)
+
+        client = yield from aiogearman.create_client(loop=self.loop)
+        job = yield from client.submit(b'rev', b'foo')
+
+        r = yield from job.wait_result()
+        self.assertEqual(r, b'oof')

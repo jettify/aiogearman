@@ -69,12 +69,12 @@ class GearmanWorker:
     def _work(self, job_id, function, data):
         job_handler_class = self._functions[function]
         job_handler = job_handler_class(self._conn, job_id)
-        func = job_handler.function
 
         try:
-            result = yield from func(data)
-            yield from self._conn.execute(WORK_COMPLETE, job_id, result,
-                                          no_ack=True)
+            result = yield from job_handler.function(data)
+            if not job_handler.is_finalised:
+                yield from self._conn.execute(WORK_COMPLETE, job_id, result,
+                                              no_ack=True)
         except Exception:
             etype, emsg, bt = sys.exc_info()
             logger.error("Worker error: {}:{}".format(etype, emsg))
@@ -154,6 +154,7 @@ class Job(metaclass=ABCMeta):
 
         :return:
         """
+        self._is_finalised = True
         yield from self._execute(WORK_FAIL)
 
     @asyncio.coroutine
