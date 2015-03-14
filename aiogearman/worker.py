@@ -91,7 +91,7 @@ class GearmanWorker:
 
     @asyncio.coroutine
     def do_jobs(self, keep_going=lambda: True):
-        while keep_going:
+        while keep_going():
             yield from self.do_job()
 
     def _push(self, packet_type, data):
