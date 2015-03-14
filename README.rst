@@ -2,8 +2,8 @@ aiogearman (work in progress)
 =============================
 .. image:: https://travis-ci.org/jettify/aiogearman.svg?branch=master
     :target: https://travis-ci.org/jettify/aiogearman
-.. image:: https://coveralls.io/repos/jettify/aiogearman/badge.svg
-    :target: https://coveralls.io/r/jettify/aiogearman
+.. image:: https://coveralls.io/repos/jettify/aiogearman/badge.svg?branch=master
+    :target: https://coveralls.io/r/jettify/aiogearman?branch=master
 
 
 *aiogearman* -- is a library for accessing a gearman_ job server from
